@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Profile</title>
+</head>
+<body>
+
+<h1>Profile</h1>
+
+<button onclick="getProfile()">Get Profile</button>
+<button onclick="getUsers()">Load All Users (Admin)</button>
+<button onclick="logout()">Logout</button>
+
+<pre id="profile"></pre>
+<pre id="users"></pre>
+
+<script>
+
+    // 🔍 Get token safely
+    function getToken() {
+        let token = localStorage.getItem("token");
+
+        console.log("Stored Token:", token); // DEBUG
+
+        if (!token) {
+            alert("Please login first ❌");
+            window.location.href = "login.html";
+            return null;
+        }
+
+        // ✅ remove accidental "Bearer "
+        if (token.startsWith("Bearer ")) {
+            token = token.substring(7);
+        }
+
+        return token;
+    }
+
+
+    // 🔐 GET PROFILE
+    function getProfile() {
+
+        const token = getToken();
+        if (!token) return;
+
+        fetch("http://localhost:9090/api/profile", {
+            method: "GET",
+            headers: {
+                "Authorization": "Bearer " + token
+            }
+        })
+            .then(res => {
+                console.log("Profile Status:", res.status);
+
+                if (res.status === 401 || res.status === 403) {
+                    alert("Unauthorized ❌ Please login again");
+                    localStorage.removeItem("token");
+                    window.location.href = "login.html";
+                    return;
+                }
+
+                return res.json();
+            })
+            .then(data => {
+                if (!data) return;
+
+                document.getElementById("profile").innerText =
+                    JSON.stringify(data, null, 2);
+            })
+            .catch(err => console.error(err));
+    }
+
+
+    // 👑 GET USERS (ADMIN)
+    function getUsers() {
+
+        const token = getToken();
+        if (!token) return;
+
+        fetch("http://localhost:9090/api/users", {
+            method: "GET",
+            headers: {
+                "Authorization": "Bearer " + token
+            }
+        })
+            .then(res => {
+                console.log("Users Status:", res.status);
+
+                if (res.status === 403) {
+                    alert("Only ADMIN can access ❌");
+                    return;
+                }
+
+                if (res.status === 401) {
+                    alert("Session expired ❌ Login again");
+                    localStorage.removeItem("token");
+                    window.location.href = "login.html";
+                    return;
+                }
+
+                return res.json();
+            })
+            .then(users => {
+                if (!users) return;
+
+                let output = "";
+
+                users.forEach(u => {
+                    output += `
+User: ${u.username} (${u.email}) - ${u.role}
+<button onclick="makeAdmin(${u.id})">Make Admin</button>
+
+-------------------------
+`;
+                });
+
+                document.getElementById("users").innerText = output;
+            })
+            .catch(err => console.error(err));
+    }
+
+
+    // 👑 MAKE ADMIN
+    function makeAdmin(id) {
+
+        const token = getToken();
+        if (!token) return;
+
+        fetch(`http://localhost:9090/api/make-admin/${id}`, {
+            method: "PUT",
+            headers: {
+                "Authorization": "Bearer " + token
+            }
+        })
+            .then(res => {
+                console.log("Make Admin Status:", res.status);
+
+                if (res.status === 403) {
+                    alert("Only ADMIN can promote ❌");
+                    return;
+                }
+
+                return res.text();
+            })
+            .then(msg => {
+                if (!msg) return;
+
+                alert(msg);
+                getUsers(); // refresh
+            })
+            .catch(err => console.error(err));
+    }
+
+
+    // 🚪 LOGOUT
+    function logout() {
+        localStorage.removeItem("token");
+        alert("Logged out ✅");
+        window.location.href = "login.html";
+    }
+
+</script>
+
+</body>
+</html>
